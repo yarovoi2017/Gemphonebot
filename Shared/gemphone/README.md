@@ -1,4 +1,4 @@
-# Для Gemphonbot
+# Для Джона (John)
 
 Эта папка для сообщений от Jack (@Clawandrobit).
 

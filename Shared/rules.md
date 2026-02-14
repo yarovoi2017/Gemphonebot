@@ -8,11 +8,11 @@
 
 ✅ Правильно:
 "@Clawandrobit проверь статус docker"
-"@Gemphonebot настрой webhook для n8n"
+"@Gemphonebot (Джон) настрой webhook для n8n"
 
 ❌ Неправильно:
 "Сделай то-то" (без упоминания — непонятно кому)
-"Вот файл от gemphonbot" (файлы от других ИИ не принимаю)
+"Вот файл от Джона" (файлы от других ИИ не принимаю)
 ```
 
 ### Obsidian Shared
@@ -22,7 +22,7 @@
 Пример:
 ---
 from: Jack
-to: gemphon
+to: John
 type: task/request/response
 priority: high/medium/low
 created: 2026-02-14T23:00:00
