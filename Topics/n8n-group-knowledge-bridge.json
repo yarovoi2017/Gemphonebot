@@ -1,0 +1,201 @@
+{
+  "name": "Group Chat Knowledge Bridge",
+  "nodes": [
+    {
+      "parameters": {
+        "updates": [
+          "message"
+        ],
+        "additionalFields": {}
+      },
+      "name": "Group Messages",
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1,
+      "position": [250, 300],
+      "webhookId": "group-knowledge-bridge",
+      "credentials": {
+        "telegramApi": {
+          "id": "telegram-bot-api",
+          "name": "Telegram Bot API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "is-group",
+              "leftValue": "={{ $json.message?.chat?.type }}",
+              "rightValue": "group",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ]
+        }
+      },
+      "name": "Filter Group",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const msg = $input.first().json.message;\nconst chat = msg.chat;\nconst from = msg.from;\n\n// Format date\nconst date = new Date(msg.date * 1000).toISOString();\n\n// Extract info\nconst entry = {\n  timestamp: date,\n  date_formatted: new Date(msg.date * 1000).toLocaleString('ru-RU'),\n  message_id: msg.message_id,\n  from_username: from?.username || null,\n  from_name: from?.first_name + (from?.last_name ? ' ' + from.last_name : ''),\n  from_id: from?.id,\n  chat_name: chat.title,\n  chat_id: chat.id,\n  text: msg.text || null,\n  has_document: !!msg.document,\n  has_photo: !!msg.photo,\n  reply_to_message: msg.reply_to_message?.message_id || null\n};\n\n// Check if mentions OpenClaw or Clawandrobot\nconst text = (msg.text || '').toLowerCase();\nentry.mentions_openclaw = text.includes('openclaw') || text.includes('@maximyarovoi');\nentry.mentions_clawandrobot = text.includes('clawandrobot') || text.includes('клэван');\n\nreturn [{ json: entry }];"
+      },
+      "name": "Format Entry",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [650, 200]
+    },
+    {
+      "parameters": {
+        "jsCode": "const entry = $input.first().json;\nconst date = entry.date_formatted;\nconst author = entry.from_username || entry.from_name;\nconst text = entry.text || '[медиа/файл]';\n\n// Format as markdown entry\nconst mdEntry = `## ${date}\\n\\n**${author}**: ${text}\\n\\n---\\n\\n`;\n\nreturn [{ json: { ...entry, markdown: mdEntry } }];"
+      },
+      "name": "Create MD Entry",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [850, 200]
+    },
+    {
+      "parameters": {
+        "fileName": "=group-chat-knowledge-{{ new Date().toISOString().split('T')[0] }}.md",
+        "fileContent": "={{ $json.markdown }}\n",
+        "options": {
+          "append": true,
+          "createDirectories": true
+        }
+      },
+      "name": "Append to MD File",
+      "type": "n8n-nodes-base.writeFile",
+      "typeVersion": 1,
+      "position": [1050, 200]
+    },
+    {
+      "parameters": {
+        "chatId": "5334588631",
+        "text": "=📁 Сообщение сохранено в файл:\n\n👤 **{{ $json.from_name }}**: {{ $json.text }}\n\n{{ $json.mentions_openclaw ? '🔔 Упомянут @MaximYarovoi' : '' }}\n{{ $json.mentions_clawandrobot ? '🔔 Упомянут @Clawandrobot' : '' }}",
+        "options": {
+          "parse_mode": "Markdown"
+        }
+      },
+      "name": "Notify Maxim",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1,
+      "position": [850, 400],
+      "credentials": {
+        "telegramApi": {
+          "id": "telegram-bot-api",
+          "name": "Telegram Bot API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const entry = $input.first().json;\nconst mentions = [];\nif (entry.mentions_openclaw) mentions.push('@MaximYarovoi');\nif (entry.mentions_clawandrobot) mentions.push('@Clawandrobot');\n\nif (mentions.length === 0) return [];\n\nreturn [{\n  json: {\n    ...entry,\n    notify_bots: mentions.join(', ')\n  }\n}];"
+      },
+      "name": "Check Mentions",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [650, 500]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=http://host.docker.internal:5678/webhook/clawandrobot-notify",
+        "body": {
+          "message": "=Новое упоминание в группе:\\n{{ $json.from_name }}: {{ $json.text }}",
+          "source": "group-chat-bridge",
+          "timestamp": "={{ $json.timestamp }}"
+        },
+        "options": {}
+      },
+      "name": "Notify Clawandrobot",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [1050, 500],
+      "disabled": true
+    }
+  ],
+  "connections": {
+    "Group Messages": {
+      "main": [
+        [
+          {
+            "node": "Filter Group",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Group": {
+      "main": [
+        [
+          {
+            "node": "Format Entry",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Entry": {
+      "main": [
+        [
+          {
+            "node": "Create MD Entry",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Check Mentions",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Notify Maxim",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create MD Entry": {
+      "main": [
+        [
+          {
+            "node": "Append to MD File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Mentions": {
+      "main": [
+        [
+          {
+            "node": "Notify Clawandrobot",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "staticData": {},
+  "tags": ["telegram", "knowledge", "group"],
+  "active": false
+}

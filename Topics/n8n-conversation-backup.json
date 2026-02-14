@@ -1,0 +1,85 @@
+{
+  "name": "Conversation Auto-Backup to Obsidian",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 15
+            }
+          ]
+        }
+      },
+      "name": "Every 15 Minutes",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "command": "python ~/.openclaw/workspace/scripts/conversation_backup.py",
+        "cwd": "={{ $env.HOME }}"
+      },
+      "name": "Create Daily Header",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "filePath": "={{ $env.HOME }}/.openclaw/vault/Daily/{{ Date.now() | dateFormat('yyyy-MM-dd') }}.md",
+        "options": {
+          "createDirectories": true
+        }
+      },
+      "name": "Ensure Daily Note Exists",
+      "type": "n8n-nodes-base.readFile",
+      "typeVersion": 2,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "fileName": "={{ $env.HOME }}/.openclaw/vault/Daily/{{ Date.now() | dateFormat('yyyy-MM-dd') }}.md",
+        "fileContent": "=\n\n## {{ Date.now() | dateFormat('HH:mm:ss') }}\n\n**Система**: Автобэкап активен\n**Статус**: ✅ Работает\n\n---\n\n",
+        "options": {
+          "append": true
+        }
+      },
+      "name": "Append Status",
+      "type": "n8n-nodes-base.writeFile",
+      "typeVersion": 1,
+      "position": [850, 300]
+    },
+    {
+      "parameters": {
+        "command": "cd ~/.openclaw/vault && git add . && git commit -m \"Auto: conversation backup $(date +%H:%M)\" && git push",
+        "cwd": "={{ $env.HOME }}"
+      },
+      "name": "Git Sync Backup",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [1050, 300]
+    }
+  ],
+  "connections": {
+    "Every 15 Minutes": {
+      "main": [[{"node": "Create Daily Header", "type": "main", "index": 0}]]
+    },
+    "Create Daily Header": {
+      "main": [[{"node": "Ensure Daily Note Exists", "type": "main", "index": 0}]]
+    },
+    "Ensure Daily Note Exists": {
+      "main": [[{"node": "Append Status", "type": "main", "index": 0}]]
+    },
+    "Append Status": {
+      "main": [[{"node": "Git Sync Backup", "type": "main", "index": 0}]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true
+  },
+  "active": false
+}

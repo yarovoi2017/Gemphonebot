@@ -1,0 +1,177 @@
+{
+  "name": "Vault Sync - Collaboration Hub",
+  "nodes": [
+    {
+      "parameters": {
+        "updates": ["message"],
+        "additionalFields": {}
+      },
+      "name": "Telegram Group Trigger",
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1,
+      "position": [250, 300],
+      "webhookId": "vault-collab-trigger",
+      "credentials": {
+        "telegramApi": {
+          "id": "telegram-bot-api",
+          "name": "Telegram Bot API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {"caseSensitive": true, "typeValidation": "strict"},
+          "conditions": [
+            {
+              "id": "is-group",
+              "leftValue": "={{ $json.message?.chat?.type }}",
+              "rightValue": "group",
+              "operator": {"type": "string", "operation": "equals"}
+            }
+          ]
+        }
+      },
+      "name": "Is Group?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const msg = $input.first().json.message;\nconst text = msg.text || '';\nconst from = msg.from;\n\n// Detect command type\nconst isSecretRequest = text.toLowerCase().includes('секрет') || text.toLowerCase().includes('токен');\nconst isVaultUpdate = text.toLowerCase().includes('vault') || text.toLowerCase().includes('заметка');\nconst isSyncRequest = text.toLowerCase().includes('синхрониз') || text.toLowerCase().includes('sync');\n\nreturn [{\n  json: {\n    text: text,\n    from_username: from?.username || from?.first_name,\n    from_id: from?.id,\n    chat_id: msg.chat.id,\n    message_id: msg.message_id,\n    is_secret_request: isSecretRequest,\n    is_vault_update: isVaultUpdate,\n    is_sync_request: isSyncRequest,\n    timestamp: new Date().toISOString()\n  }\n}];"
+      },
+      "name": "Parse Command",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [650, 200]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {"typeValidation": "strict"},
+          "conditions": [
+            {"id": "secret", "leftValue": "={{ $json.is_secret_request }}", "rightValue": true, "operator": {"type": "boolean", "operation": "equals"}},
+            {"id": "vault", "leftValue": "={{ $json.is_vault_update }}", "rightValue": true, "operator": {"type": "boolean", "operation": "equals"}},
+            {"id": "sync", "leftValue": "={{ $json.is_sync_request }}", "rightValue": true, "operator": {"type": "boolean", "operation": "equals"}}
+          ]
+        }
+      },
+      "name": "Route Command",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 1,
+      "position": [850, 200]
+    },
+    {
+      "parameters": {
+        "command": "pull && add . && commit -m \"Auto-sync from Telegram\" && push",
+        "cwd": "={{ $env.HOME }}/.openclaw/vault"
+      },
+      "name": "Git Sync",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [1050, 100]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.chat_id }}",
+        "replyToMessage": "={{ $json.message_id }}",
+        "text": "=🔄 Синхронизация выполнена!\n\nПоследние изменения:\n{{ $json.sync_result }}"
+      },
+      "name": "Notify Sync Success",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1,
+      "position": [1250, 100],
+      "credentials": {"telegramApi": {"id": "telegram-bot-api", "name": "Telegram Bot API"}}
+    },
+    {
+      "parameters": {
+        "filePath": "={{ $env.HOME }}/.openclaw/vault/Secrets.kdbx",
+        "operation": "read",
+        "entry": "={{ $json.requested_secret }}"
+      },
+      "name": "Read KeePass",
+      "type": "n8n-nodes-base.keepass",
+      "typeVersion": 1,
+      "position": [1050, 250]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.from_id }}",
+        "text": "=🔑 Запрошенный секрет:\n\nНазвание: {{ $json.secret_title }}\nЛогин: {{ $json.secret_username }}\nПароль: `{{ $json.secret_password }}`\n\n⚠️ Скопируйте сейчас — сообщение удалится через 5 минут!"
+      },
+      "name": "Send Secret (DM)",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1,
+      "position": [1250, 250],
+      "credentials": {"telegramApi": {"id": "telegram-bot-api", "name": "Telegram Bot API"}}
+    },
+    {
+      "parameters": {
+        "delay": 300
+      },
+      "name": "Wait 5 min",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1,
+      "position": [1450, 250]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.from_id }}",
+        "messageId": "={{ $json.sent_message_id }}",
+        "operation": "deleteMessage"
+      },
+      "name": "Delete Secret Message",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1,
+      "position": [1650, 250],
+      "credentials": {"telegramApi": {"id": "telegram-bot-api", "name": "Telegram Bot API"}}
+    },
+    {
+      "parameters": {
+        "fileName": "=shared-note-{{ Date.now() }}.md",
+        "fileContent": "={{ $json.note_content }}",
+        "options": {"append": true}
+      },
+      "name": "Save to Vault",
+      "type": "n8n-nodes-base.writeFile",
+      "typeVersion": 1,
+      "position": [1050, 400]
+    }
+  ],
+  "connections": {
+    "Telegram Group Trigger": {
+      "main": [[{"node": "Is Group?", "type": "main", "index": 0}]]
+    },
+    "Is Group?": {
+      "main": [[{"node": "Parse Command", "type": "main", "index": 0}]]
+    },
+    "Parse Command": {
+      "main": [[{"node": "Route Command", "type": "main", "index": 0}]]
+    },
+    "Route Command": {
+      "main": [
+        [{"node": "Git Sync", "type": "main", "index": 0}],
+        [{"node": "Read KeePass", "type": "main", "index": 0}],
+        [{"node": "Save to Vault", "type": "main", "index": 0}]
+      ]
+    },
+    "Git Sync": {
+      "main": [[{"node": "Notify Sync Success", "type": "main", "index": 0}]]
+    },
+    "Read KeePass": {
+      "main": [[{"node": "Send Secret (DM)", "type": "main", "index": 0}]]
+    },
+    "Send Secret (DM)": {
+      "main": [[{"node": "Wait 5 min", "type": "main", "index": 0}]]
+    },
+    "Wait 5 min": {
+      "main": [[{"node": "Delete Secret Message", "type": "main", "index": 0}]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true
+  },
+  "active": false
+}
