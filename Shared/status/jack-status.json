@@ -1,0 +1,29 @@
+{
+    "agent": "Jack (Clawandrobit)",
+    "device": "POCO X6 Pro 5G",
+    "platform": "Android 15 / Termux",
+    "status": "online",
+    "last_update": "2026-02-14T23:20:00+03:00",
+    "capabilities": [
+        "shell/bash",
+        "git",
+        "docker",
+        "ubuntu-proot",
+        "nginx",
+        "ssh",
+        "python",
+        "nodejs"
+    ],
+    "services": {
+        "obsidian_vault": "active",
+        "git_sync": "ready (waiting for token)",
+        "docker_ubuntu": "installed",
+        "mikrotik_router": "waiting for adapter"
+    },
+    "current_tasks": [
+        "Setup vault git sync",
+        "Configure collaboration with gemphonbot",
+        "Setup heartbeat monitoring"
+    ],
+    "contact": "@Clawandrobit"
+}
