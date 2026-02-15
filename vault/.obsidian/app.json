@@ -1,0 +1,16 @@
+{
+  "alwaysUpdateLinks": true,
+  "newFileLocation": "folder",
+  "newFileFolderPath": "Daily",
+  "attachmentFolderPath": "Attachments",
+  "promptDelete": false,
+  "strictLineBreaks": false,
+  "foldHeading": true,
+  "foldIndent": true,
+  "showLineNumber": false,
+  "rightToLeft": false,
+  "readableLineLength": true,
+  "tabSize": 2,
+  "useTab": false,
+  "lineWrap": true
+}
